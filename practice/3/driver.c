@@ -96,7 +96,7 @@ int init_module(void) {
     return -1;
 
   // создаём класс
-  my_class = class_create(THIS_MODULE, "pz3_class");
+  my_class = class_create("pz3_class");
   if (IS_ERR(my_class))
     return -1;
 
