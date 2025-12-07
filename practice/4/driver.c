@@ -87,7 +87,7 @@ static struct file_operations fops = {
 
 int init_module(void) {
   // выделяем номер устройства
-  if (alloc_chrdev_region(&dev_num, 0, 1, "pz3") < 0)
+  if (alloc_chrdev_region(&dev_num, 0, 1, "pz4") < 0)
     return -1;
 
   // создаём символьный драйвер
@@ -96,12 +96,12 @@ int init_module(void) {
     return -1;
 
   // создаём класс
-  my_class = class_create("pz3_class");
+  my_class = class_create("pz4_class");
   if (IS_ERR(my_class))
     return -1;
 
   // создаём спецфайл автоматически
-  device_create(my_class, NULL, dev_num, NULL, "pz3_dev");
+  device_create(my_class, NULL, dev_num, NULL, "pz4_dev");
 
   pr_info("драйвер загружен, major=%d\n", MAJOR(dev_num));
   return 0;

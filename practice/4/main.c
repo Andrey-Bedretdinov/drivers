@@ -7,7 +7,7 @@
 #define IOCTL_HASDATA _IOR('q', 2, int)
 
 int main() {
-  const char *dev = "/dev/pz3_dev";
+  const char *dev = "/dev/pz4_dev";
   char buf[256];
 
   printf("открываем устройство...\n");
