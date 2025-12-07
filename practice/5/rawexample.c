@@ -20,7 +20,7 @@ union ethframe
 };
 
 int main(int argc, char **argv) {
-  char *iface = "eth0";
+  char *iface = "netdemo0";
   unsigned char dest[ETH_ALEN] = { 0x00, 0x12, 0x34, 0x56, 0x78, 0x90 };
 
   unsigned short proto = 0x1234;
