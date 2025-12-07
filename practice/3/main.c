@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 int main() {
-  const char* dev = "/dev/foo_device";
+  const char *dev = "/dev/foo_device";
 
   printf("открываем устройство: %s\n", dev);
 
