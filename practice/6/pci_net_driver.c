@@ -3,8 +3,8 @@
 #include <linux/netdevice.h>
 #include <linux/pci.h>
 
-#define MY_VENDOR 0x8086
-#define MY_DEVICE 0x100e
+#define MY_VENDOR 0x1af4
+#define MY_DEVICE 0x1041
 
 static struct net_device *ndev;
 
