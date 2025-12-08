@@ -63,9 +63,25 @@ static int pci_demo_probe(struct pci_dev *pdev,
   // привязываем netdev к pci_dev
   pci_set_drvdata(pdev, ndev);
 
-  // читаем MAC из PCI config space (6 байт)
-  for (i = 0; i < ETH_ALEN; i++)
-    pci_read_config_byte(pdev, 0x10 + i, &ndev->dev_addr[i]);
+  void __iomem *mmio;
+  u32 ral, rah;
+
+  mmio = pci_iomap(pdev, 0, 0);
+  if (!mmio) {
+      pr_err("pci_net: не удалось ioremap BAR0\n");
+      free_netdev(ndev);
+      return -ENODEV;
+  }
+
+  ral = readl(mmio + 0x5400);
+  rah = readl(mmio + 0x5404);
+
+  ndev->dev_addr[0] = ral & 0xff;
+  ndev->dev_addr[1] = (ral >> 8) & 0xff;
+  ndev->dev_addr[2] = (ral >> 16) & 0xff;
+  ndev->dev_addr[3] = (ral >> 24) & 0xff;
+  ndev->dev_addr[4] = rah & 0xff;
+  ndev->dev_addr[5] = (rah >> 8) & 0xff;
 
   pr_info("pci_net: MAC-адрес = %pM\n", ndev->dev_addr);
 
