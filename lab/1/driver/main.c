@@ -7,8 +7,8 @@
 #include <linux/uaccess.h>
 
 #define DEVICE_NAME "lab1dev"
-#define MAX_BINS 20
 #define BIN_WIDTH_US 50
+#define MAX_BINS 20
 
 #define IOCTL_GET_HIST_LEN _IOR('x', 1, int)
 #define IOCTL_GET_HIST_BUF _IOR('x', 2, size_t[MAX_BINS])
@@ -17,12 +17,17 @@ static dev_t dev_num;
 static struct cdev c_dev;
 static struct class *cl;
 
+// данные
 static int stored_value = 0;
 static bool buf_is_empty = true;
 
+// гистограмма
 static size_t histogram[MAX_BINS] = {0};
+static size_t histogram_len = 1; // начинаем с первого бина
+static unsigned long time_from_bin_start = 0;
 
-static unsigned long last_write_time = 0;
+// время
+static unsigned long last_write_jiffies = 0;
 
 static int dev_open(struct inode *i, struct file *f) {
   pr_info("lab1: устройство открыто\n");
@@ -44,7 +49,7 @@ static ssize_t dev_write(struct file *f, const char __user *buf, size_t len,
 
   buf_is_empty = false;
 
-  last_write_time = jiffies;
+  last_write_jiffies = jiffies;
 
   return sizeof(int);
 }
@@ -60,28 +65,39 @@ static ssize_t dev_read(struct file *f, char __user *buf, size_t len,
   if (copy_to_user(buf, &stored_value, sizeof(int)))
     return -EFAULT;
 
-  unsigned long delta = jiffies - last_write_time;
-  unsigned long delta_us = jiffies_to_usecs(delta);
+  // считаем время между write и read
+  unsigned long delta_j = jiffies - last_write_jiffies;
+  unsigned long delta_us = jiffies_to_usecs(delta_j);
 
-  int bin = delta_us / BIN_WIDTH_US;
-  if (bin >= MAX_BINS)
-    bin = MAX_BINS - 1;
+  // накапливаем время внутри бина
+  time_from_bin_start += delta_us;
 
-  histogram[bin]++;
+  // увеличиваем количество попаданий в текущий бин
+  histogram[histogram_len - 1]++;
+
+  // если накопленное время превысило ширину бина — переходим дальше
+  if (time_from_bin_start >= BIN_WIDTH_US) {
+    time_from_bin_start = 0;
+
+    if (histogram_len < MAX_BINS)
+      histogram_len++;
+  }
+
+  // записываем время новой операции
+  last_write_jiffies = jiffies;
 
   return sizeof(int);
 }
 
 static long dev_ioctl(struct file *f, unsigned int cmd, unsigned long arg) {
   switch (cmd) {
-  case IOCTL_GET_HIST_LEN: {
-    int len = MAX_BINS;
-    if (copy_to_user((int *)arg, &len, sizeof(len)))
+  case IOCTL_GET_HIST_LEN:
+    if (copy_to_user((int *)arg, &histogram_len, sizeof(histogram_len)))
       return -EFAULT;
     break;
-  }
+
   case IOCTL_GET_HIST_BUF:
-    if (copy_to_user((size_t *)arg, histogram, sizeof(histogram)))
+    if (copy_to_user((size_t *)arg, histogram, histogram_len * sizeof(size_t)))
       return -EFAULT;
     break;
 
@@ -100,6 +116,7 @@ static struct file_operations fops = {.owner = THIS_MODULE,
 
 static int __init lab1_init(void) {
   alloc_chrdev_region(&dev_num, 0, 1, DEVICE_NAME);
+
   cdev_init(&c_dev, &fops);
   cdev_add(&c_dev, dev_num, 1);
 
@@ -115,13 +132,12 @@ static void __exit lab1_exit(void) {
   class_destroy(cl);
   cdev_del(&c_dev);
   unregister_chrdev_region(dev_num, 1);
-
   pr_info("lab1: драйвер выгружен\n");
 }
-
-module_init(lab1_init);
-module_exit(lab1_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("andrey");
 MODULE_DESCRIPTION("Lab1 char driver");
+
+module_init(lab1_init);
+module_exit(lab1_exit);
