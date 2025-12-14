@@ -1,6 +1,5 @@
 #include <fcntl.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -13,8 +12,9 @@ int main() {
   int reader_fd = open(path, O_RDONLY);
   int writer_fd = open(path, O_WRONLY);
 
-  for (int i = 0; i < 1000; i++) {
+  for (size_t i = 0; i < 1000; i++) {
     write(writer_fd, &i, sizeof(int));
+    usleep(60); // <<< ВАЖНО
     read(reader_fd, &i, sizeof(int));
   }
 

@@ -60,7 +60,6 @@ static ssize_t dev_read(struct file *f, char __user *buf, size_t len,
   if (copy_to_user(buf, &stored_value, sizeof(int)))
     return -EFAULT;
 
-  // измеряем время
   unsigned long delta = jiffies - last_write_time;
   unsigned long delta_us = jiffies_to_usecs(delta);
 
@@ -85,6 +84,7 @@ static long dev_ioctl(struct file *f, unsigned int cmd, unsigned long arg) {
     if (copy_to_user((size_t *)arg, histogram, sizeof(histogram)))
       return -EFAULT;
     break;
+
   default:
     return -EINVAL;
   }
