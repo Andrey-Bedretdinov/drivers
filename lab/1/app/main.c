@@ -1,43 +1,45 @@
-#include <stdio.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 
 #define IOCTL_GET_HIST_LEN _IOR('x', 1, int)
-#define IOCTL_GET_HIST_BUF _IOR('x', 2, size_t[20])
+#define IOCTL_GET_HIST_BUF _IOR('x', 2, size_t[500])
 
-int main(void)
-{
-  int reader_fd = open("/dev/lab1dev", O_RDONLY);
+int main() {
+  const char *path = "/dev/lab1dev";
+
+  int reader_fd = open(path, O_RDONLY);
   if (reader_fd < 0) {
-    perror("ошибка открытия reader_fd");
+    perror("Ошибка открытия reader_fd");
     return 1;
   }
 
-  int writer_fd = open("/dev/lab1dev", O_WRONLY);
+  int writer_fd = open(path, O_WRONLY);
   if (writer_fd < 0) {
-    perror("ошибка открытия writer_fd");
+    perror("Ошибка открытия writer_fd");
     close(reader_fd);
     return 1;
   }
 
-  for (int i = 0; i < 1000; i++) {
+  for (size_t i = 0; i < 1000; i++) {
     write(writer_fd, &i, sizeof(int));
-
-    int r;
-    read(reader_fd, &r, sizeof(int));
+    read(reader_fd, &i, sizeof(int));
   }
 
-  int hist_len = 0;
+  size_t hist_len = 0;
   ioctl(reader_fd, IOCTL_GET_HIST_LEN, &hist_len);
 
-  size_t hist_buf[20];
-  ioctl(reader_fd, IOCTL_GET_HIST_BUF, hist_buf);
+  printf("Гистограмма, длина = %zu\n", hist_len);
 
-  printf("Гистограмма (%d бинов):\n", hist_len);
+  size_t *buf = malloc(hist_len * sizeof(size_t));
+  ioctl(reader_fd, IOCTL_GET_HIST_BUF, buf);
 
-  for (int i = 0; i < hist_len; i++)
-    printf("Бин %02d: %ld\n", i, hist_buf[i]);
+  for (size_t i = 0; i < hist_len; i++)
+    printf("%zu:\t%zu\n", i, buf[i]);
+
+  free(buf);
 
   close(reader_fd);
   close(writer_fd);
