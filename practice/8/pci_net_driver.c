@@ -1,3 +1,7 @@
+#include <linux/etherdevice.h>
+#include <linux/module.h>
+#include <linux/netdevice.h>
+#include <linux/pci.h>
 #include <linux/device.h>
 #include <linux/io.h>
 
@@ -22,12 +26,6 @@ static ssize_t io_address_show(struct device *dev,
 }
 
 static DEVICE_ATTR(io_address, 0444, io_address_show, NULL);
-
-
-#include <linux/etherdevice.h>
-#include <linux/module.h>
-#include <linux/netdevice.h>
-#include <linux/pci.h>
 
 #define MY_VENDOR 0x8086
 #define MY_DEVICE 0x10d3
