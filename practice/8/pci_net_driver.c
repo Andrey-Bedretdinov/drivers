@@ -1,4 +1,6 @@
 #include <linux/device.h>
+#include <linux/io.h>
+
 // инфо о ресурсах PCI для sysfs
 unsigned long pci_res_start;
 int pci_res_len;
