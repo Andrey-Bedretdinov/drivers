@@ -24,12 +24,12 @@ static size_t histogram[MAX_BINS] = {0};
 static int hist_len = MAX_BINS;
 
 static int dev_open(struct inode *i, struct file *f) {
-  pr_info("lab1: open\n");
+  pr_info("lab1: устройство открыто\n");
   return 0;
 }
 
 static int dev_close(struct inode *i, struct file *f) {
-  pr_info("lab1: close\n");
+  pr_info("lab1: устройство закрыто\n");
   return 0;
 }
 
@@ -102,7 +102,7 @@ static int __init lab1_init(void) {
 
   device_create(cl, NULL, dev_num, NULL, DEVICE_NAME);
 
-  pr_info("lab1: driver loaded\n");
+  pr_info("lab1: драйвер загружен\n");
   return 0;
 }
 
@@ -111,7 +111,7 @@ static void __exit lab1_exit(void) {
   class_destroy(cl);
   cdev_del(&c_dev);
   unregister_chrdev_region(dev_num, 1);
-  pr_info("lab1: driver unloaded\n");
+  pr_info("lab1: драйвер выгружен\n");
 }
 
 MODULE_LICENSE("GPL");

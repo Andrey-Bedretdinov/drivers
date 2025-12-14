@@ -8,32 +8,38 @@
 
 int main(void)
 {
-  int fd = open("/dev/lab1dev", O_RDWR);
-  if (fd < 0) {
-    perror("open");
+  int reader_fd = open("/dev/lab1dev", O_RDONLY);
+  if (reader_fd < 0) {
+    perror("ошибка открытия reader_fd");
+    return 1;
+  }
+
+  int writer_fd = open("/dev/lab1dev", O_WRONLY);
+  if (writer_fd < 0) {
+    perror("ошибка открытия writer_fd");
+    close(reader_fd);
     return 1;
   }
 
   for (int i = 0; i < 1000; i++) {
-    write(fd, &i, sizeof(int));
-
-    usleep(200);
+    write(writer_fd, &i, sizeof(int));
 
     int r;
-    read(fd, &r, sizeof(int));
+    read(reader_fd, &r, sizeof(int));
   }
 
   int hist_len = 0;
-  ioctl(fd, IOCTL_GET_HIST_LEN, &hist_len);
+  ioctl(reader_fd, IOCTL_GET_HIST_LEN, &hist_len);
 
   size_t hist_buf[20];
-  ioctl(fd, IOCTL_GET_HIST_BUF, hist_buf);
+  ioctl(reader_fd, IOCTL_GET_HIST_BUF, hist_buf);
 
-  printf("Histogram (%d bins):\n", hist_len);
+  printf("Гистограмма (%d бинов):\n", hist_len);
 
   for (int i = 0; i < hist_len; i++)
-    printf("%02d: %ld\n", i, hist_buf[i]);
+    printf("Бин %02d: %ld\n", i, hist_buf[i]);
 
-  close(fd);
+  close(reader_fd);
+  close(writer_fd);
   return 0;
 }
