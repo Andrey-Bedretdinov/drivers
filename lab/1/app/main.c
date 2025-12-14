@@ -17,6 +17,8 @@ int main(void)
   for (int i = 0; i < 1000; i++) {
     write(fd, &i, sizeof(int));
 
+    usleep(200);
+
     int r;
     read(fd, &r, sizeof(int));
   }
