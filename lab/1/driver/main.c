@@ -13,6 +13,7 @@
 #define IOCTL_GET_HIST_LEN _IOR('x', 1, int)
 #define IOCTL_GET_HIST_BUF _IOR('x', 2, size_t[MAX_BINS])
 
+// глобальные переменные
 static dev_t dev_num;
 static struct cdev c_dev;
 static struct class *cl;
@@ -29,16 +30,19 @@ static unsigned long time_from_bin_start = 0;
 // время
 static unsigned long last_write_jiffies = 0;
 
+// обработчик открытия устройства
 static int dev_open(struct inode *i, struct file *f) {
   pr_info("lab1: устройство открыто\n");
   return 0;
 }
 
+// обработчик закрытия устройства
 static int dev_close(struct inode *i, struct file *f) {
   pr_info("lab1: устройство закрыто\n");
   return 0;
 }
 
+// записываю число и фиксирую время записи
 static ssize_t dev_write(struct file *f, const char __user *buf, size_t len,
                          loff_t *off) {
   if (len != sizeof(int))
@@ -54,6 +58,7 @@ static ssize_t dev_write(struct file *f, const char __user *buf, size_t len,
   return sizeof(int);
 }
 
+// читаю число и обновляю гистограмму
 static ssize_t dev_read(struct file *f, char __user *buf, size_t len,
                         loff_t *off) {
   if (buf_is_empty)
@@ -89,6 +94,7 @@ static ssize_t dev_read(struct file *f, char __user *buf, size_t len,
   return sizeof(int);
 }
 
+// обрабатываю команды ioctl
 static long dev_ioctl(struct file *f, unsigned int cmd, unsigned long arg) {
   switch (cmd) {
   case IOCTL_GET_HIST_LEN:
@@ -114,6 +120,7 @@ static struct file_operations fops = {.owner = THIS_MODULE,
                                       .read = dev_read,
                                       .unlocked_ioctl = dev_ioctl};
 
+// инициализация драйвера
 static int __init lab1_init(void) {
   alloc_chrdev_region(&dev_num, 0, 1, DEVICE_NAME);
 
@@ -127,6 +134,7 @@ static int __init lab1_init(void) {
   return 0;
 }
 
+// выгрузка драйвера
 static void __exit lab1_exit(void) {
   device_destroy(cl, dev_num);
   class_destroy(cl);
