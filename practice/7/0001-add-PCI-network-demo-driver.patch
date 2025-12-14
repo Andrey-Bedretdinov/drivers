@@ -1,0 +1,209 @@
+From 38e6018779d9a534e4cb21c23f84b9540ba5d9eb Mon Sep 17 00:00:00 2001
+From: Andrey Bedretdinov <andrey.bedretdinov@gmail.com>
+Date: Sun, 14 Dec 2025 03:27:03 +0300
+Subject: [PATCH] add PCI network demo driver
+
+Signed-off-by: Andrey Bedretdinov <andrey.bedretdinov@gmail.com>
+---
+ drivers/net/ethernet/Kconfig                  |   1 +
+ drivers/net/ethernet/Makefile                 |   1 +
+ drivers/net/ethernet/mydriver/Kconfig         |   7 +
+ drivers/net/ethernet/mydriver/Makefile        |   1 +
+ .../net/ethernet/mydriver/pci_net_driver.c    | 143 ++++++++++++++++++
+ 5 files changed, 153 insertions(+)
+ create mode 100644 drivers/net/ethernet/mydriver/Kconfig
+ create mode 100644 drivers/net/ethernet/mydriver/Makefile
+ create mode 100644 drivers/net/ethernet/mydriver/pci_net_driver.c
+
+diff --git a/drivers/net/ethernet/Kconfig b/drivers/net/ethernet/Kconfig
+index 5a274b99f299..3aa0d932e9b6 100644
+--- a/drivers/net/ethernet/Kconfig
++++ b/drivers/net/ethernet/Kconfig
+@@ -192,5 +192,6 @@ source "drivers/net/ethernet/wangxun/Kconfig"
+ source "drivers/net/ethernet/wiznet/Kconfig"
+ source "drivers/net/ethernet/xilinx/Kconfig"
+ source "drivers/net/ethernet/xircom/Kconfig"
++source "drivers/net/ethernet/mydriver/Kconfig"
+ 
+ endif # ETHERNET
+diff --git a/drivers/net/ethernet/Makefile b/drivers/net/ethernet/Makefile
+index 0d872d4efcd1..04c7d1434414 100644
+--- a/drivers/net/ethernet/Makefile
++++ b/drivers/net/ethernet/Makefile
+@@ -104,3 +104,4 @@ obj-$(CONFIG_NET_VENDOR_XILINX) += xilinx/
+ obj-$(CONFIG_NET_VENDOR_XIRCOM) += xircom/
+ obj-$(CONFIG_NET_VENDOR_SYNOPSYS) += synopsys/
+ obj-$(CONFIG_NET_VENDOR_PENSANDO) += pensando/
++obj-$(CONFIG_PCI_NET_DEMO) += mydriver/
+diff --git a/drivers/net/ethernet/mydriver/Kconfig b/drivers/net/ethernet/mydriver/Kconfig
+new file mode 100644
+index 000000000000..b79974addd9b
+--- /dev/null
++++ b/drivers/net/ethernet/mydriver/Kconfig
+@@ -0,0 +1,7 @@
++config MYDRIVER
++	tristate "My PCI Network Driver"
++	depends on PCI
++	help
++	  Простой учебный PCI сетевой драйвер.
++	  Реализует probe/remove, чтение MAC-адреса и передачу пакетов
++	  через заглушку hard_start_xmit.
+diff --git a/drivers/net/ethernet/mydriver/Makefile b/drivers/net/ethernet/mydriver/Makefile
+new file mode 100644
+index 000000000000..8f7df57ed746
+--- /dev/null
++++ b/drivers/net/ethernet/mydriver/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_MYDRIVER) += pci_net_driver.o
+diff --git a/drivers/net/ethernet/mydriver/pci_net_driver.c b/drivers/net/ethernet/mydriver/pci_net_driver.c
+new file mode 100644
+index 000000000000..fa4c8c7ca229
+--- /dev/null
++++ b/drivers/net/ethernet/mydriver/pci_net_driver.c
+@@ -0,0 +1,143 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/etherdevice.h>
++#include <linux/module.h>
++#include <linux/netdevice.h>
++#include <linux/pci.h>
++
++#define MY_VENDOR 0x8086
++#define MY_DEVICE 0x10d3
++
++static struct net_device *ndev;
++
++/* open */
++static int net_open(struct net_device *dev)
++{
++	pr_info("pci_net: интерфейс открыт\n");
++	netif_start_queue(dev);
++	return 0;
++}
++
++/* stop */
++static int net_stop(struct net_device *dev)
++{
++	pr_info("pci_net: интерфейс остановлен\n");
++	netif_stop_queue(dev);
++	return 0;
++}
++
++/* имитация отправки пакета */
++static netdev_tx_t net_xmit(struct sk_buff *skb, struct net_device *dev)
++{
++	pr_info("pci_net: пакет получен в hard_start_xmit, длина=%d байт\n",
++		skb->len);
++
++	print_hex_dump(KERN_INFO, "pci_net пакет: ",
++		       DUMP_PREFIX_OFFSET, 16, 1,
++		       skb->data, skb->len, true);
++
++	dev->stats.tx_packets++;
++	dev->stats.tx_bytes += skb->len;
++
++	dev_kfree_skb(skb);
++	return NETDEV_TX_OK;
++}
++
++static const struct net_device_ops net_ops = {
++	.ndo_open		= net_open,
++	.ndo_stop		= net_stop,
++	.ndo_start_xmit		= net_xmit,
++};
++
++/* PCI probe */
++static int pci_demo_probe(struct pci_dev *pdev,
++			  const struct pci_device_id *id)
++{
++	void __iomem *mmio;
++	u32 ral, rah;
++	unsigned char mac[ETH_ALEN];
++
++	pr_info("pci_net: probe вызван для устройства %04x:%04x\n",
++		id->vendor, id->device);
++
++	pci_set_master(pdev);
++
++	if (pci_enable_device(pdev))
++		return -ENODEV;
++
++	ndev = alloc_etherdev(0);
++	if (!ndev)
++		return -ENOMEM;
++
++	pci_set_drvdata(pdev, ndev);
++
++	mmio = pci_iomap(pdev, 0, 0);
++	if (!mmio) {
++		pr_err("pci_net: не удалось ioremap BAR0\n");
++		free_netdev(ndev);
++		return -ENODEV;
++	}
++
++	ndev->mem_start = (unsigned long)mmio;
++
++	ral = readl(mmio + 0x5400);
++	rah = readl(mmio + 0x5404);
++
++	mac[0] = ral & 0xff;
++	mac[1] = (ral >> 8) & 0xff;
++	mac[2] = (ral >> 16) & 0xff;
++	mac[3] = (ral >> 24) & 0xff;
++	mac[4] = rah & 0xff;
++	mac[5] = (rah >> 8) & 0xff;
++
++	eth_hw_addr_set(ndev, mac);
++
++	pr_info("pci_net: MAC-адрес = %pM\n", ndev->dev_addr);
++
++	ndev->netdev_ops = &net_ops;
++
++	if (register_netdev(ndev)) {
++		pr_err("pci_net: ошибка при регистрации интерфейса\n");
++		free_netdev(ndev);
++		return -ENODEV;
++	}
++
++	pr_info("pci_net: интерфейс зарегистрирован как %s\n", ndev->name);
++
++	return 0;
++}
++
++/* PCI remove */
++static void pci_demo_remove(struct pci_dev *pdev)
++{
++	struct net_device *dev = pci_get_drvdata(pdev);
++	void __iomem *mmio = (void __iomem *)dev->mem_start;
++
++	pr_info("pci_net: remove вызван, модуль выгружается\n");
++
++	unregister_netdev(dev);
++	pci_iounmap(pdev, mmio);
++	free_netdev(dev);
++	pci_disable_device(pdev);
++
++	pr_info("pci_net: модуль успешно выгружен\n");
++}
++
++static const struct pci_device_id pci_demo_ids[] = {
++	{ PCI_DEVICE(MY_VENDOR, MY_DEVICE) },
++	{ }
++};
++
++MODULE_DEVICE_TABLE(pci, pci_demo_ids);
++
++static struct pci_driver pci_demo_driver = {
++	.name		= "pci_net_demo",
++	.id_table	= pci_demo_ids,
++	.probe		= pci_demo_probe,
++	.remove		= pci_demo_remove,
++};
++
++module_pci_driver(pci_demo_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("andrey");
++MODULE_DESCRIPTION("PCI сетевой драйвер");
+-- 
+2.34.1
+
