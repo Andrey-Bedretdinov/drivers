@@ -25,7 +25,7 @@ int main() {
 
   for (size_t i = 0; i < 1000; i++) {
     write(writer_fd, &i, sizeof(int));
-    usleep(200);
+    usleep(50);
     read(reader_fd, &i, sizeof(int));
   }
 
