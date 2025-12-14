@@ -69,23 +69,20 @@ static ssize_t dev_read(struct file *f, char __user *buf, size_t len,
 
   pr_info("lab1: прочитано число %d\n", stored_value);
 
-  // вычисляем задержку
   unsigned long delta = jiffies - last_write_time;
-  unsigned long delta_us = jiffies_to_usecs(delta);
+  time_from_bin_start += delta;
 
-  // добавляем к сумме текущего бина
-  time_from_bin_start += delta_us;
-
-  // увеличиваем количество в текущем бинe
   histogram[histogram_len]++;
 
-  // если бин заполнился — переходим к следующему
-  if (time_from_bin_start >= BIN_WIDTH_US) {
+  // переходим к следующему бину
+  if (jiffies_to_usecs(time_from_bin_start) >= BIN_WIDTH_US) {
     time_from_bin_start = 0;
 
     if (histogram_len < MAX_BINS - 1)
       histogram_len++;
   }
+
+  last_write_time = jiffies;
 
   return sizeof(int);
 }
