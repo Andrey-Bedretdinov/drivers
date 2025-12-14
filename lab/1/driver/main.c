@@ -98,7 +98,7 @@ static int __init lab1_init(void)
   alloc_chrdev_region(&dev_num, 0, 1, DEVICE_NAME);
   cdev_init(&c_dev, &fops);
   cdev_add(&c_dev, dev_num, 1);
-  cl = class_create(THIS_MODULE, DEVICE_NAME);
+  cl = class_create(DEVICE_NAME);
   device_create(cl, NULL, dev_num, NULL, DEVICE_NAME);
 
   pr_info("lab1: driver loaded\n");
