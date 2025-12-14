@@ -7,8 +7,8 @@
 #include <linux/uaccess.h>
 
 #define DEVICE_NAME "lab1dev"
-#define MAX_BINS 40
-#define BIN_WIDTH_US 5
+#define MAX_BINS 5
+#define BIN_WIDTH_US 1
 
 #define IOCTL_GET_HIST_LEN _IOR('x', 1, int)
 #define IOCTL_GET_HIST_BUF _IOR('x', 2, size_t[MAX_BINS])
