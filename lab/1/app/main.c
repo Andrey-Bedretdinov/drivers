@@ -25,7 +25,6 @@ int main() {
 
   for (size_t i = 0; i < 1000; i++) {
     write(writer_fd, &i, sizeof(int));
-    usleep(100);
     read(reader_fd, &i, sizeof(int));
   }
 
@@ -41,8 +40,8 @@ int main() {
     printf("%zu:\t%zu\n", i, buf[i]);
 
   free(buf);
-
   close(reader_fd);
   close(writer_fd);
+
   return 0;
 }

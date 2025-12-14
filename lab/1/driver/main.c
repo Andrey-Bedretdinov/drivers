@@ -7,8 +7,8 @@
 #include <linux/uaccess.h>
 
 #define DEVICE_NAME "lab1dev"
-#define MAX_BINS 40
 #define BIN_WIDTH_US 50
+#define MAX_BINS 500
 
 #define IOCTL_GET_HIST_LEN _IOR('x', 1, int)
 #define IOCTL_GET_HIST_BUF _IOR('x', 2, size_t[MAX_BINS])
@@ -17,6 +17,7 @@ static dev_t dev_num;
 static struct cdev c_dev;
 static struct class *cl;
 
+// данные
 static int stored_value = 0;
 static bool buf_is_empty = true;
 
@@ -68,14 +69,17 @@ static ssize_t dev_read(struct file *f, char __user *buf, size_t len,
 
   pr_info("lab1: прочитано число %d\n", stored_value);
 
-  // вычисление времени
+  // вычисляем задержку
   unsigned long delta = jiffies - last_write_time;
   unsigned long delta_us = jiffies_to_usecs(delta);
 
+  // добавляем к сумме текущего бина
   time_from_bin_start += delta_us;
 
+  // увеличиваем количество в текущем бинe
   histogram[histogram_len]++;
 
+  // если бин заполнился — переходим к следующему
   if (time_from_bin_start >= BIN_WIDTH_US) {
     time_from_bin_start = 0;
 
@@ -115,6 +119,7 @@ static struct file_operations fops = {.owner = THIS_MODULE,
 
 static int __init lab1_init(void) {
   alloc_chrdev_region(&dev_num, 0, 1, DEVICE_NAME);
+
   cdev_init(&c_dev, &fops);
   cdev_add(&c_dev, dev_num, 1);
 
@@ -122,6 +127,7 @@ static int __init lab1_init(void) {
   device_create(cl, NULL, dev_num, NULL, DEVICE_NAME);
 
   pr_info("lab1: драйвер загружен\n");
+
   return 0;
 }
 
