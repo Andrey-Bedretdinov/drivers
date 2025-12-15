@@ -1,10 +1,10 @@
-obj-m += main.o
+CC = gcc
+CFLAGS = -Wall -Wextra
 
-KDIR := /lib/modules/$(shell uname -r)/build
-PWD  := $(shell pwd)
+all: main
 
-all:
-	make -C $(KDIR) M=$(PWD) modules
+main: main.c
+	$(CC) $(CFLAGS) main.c -o main
 
 clean:
-	make -C $(KDIR) M=$(PWD) clean
+	rm -f main
