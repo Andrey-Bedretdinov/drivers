@@ -1,10 +1,7 @@
 obj-m += can_eth.o
 
-KDIR ?= /lib/modules/$(shell uname -r)/build
-PWD  := $(shell pwd)
-
 all:
-	make -C $(KDIR) M=$(PWD) modules
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 clean:
-	make -C $(KDIR) M=$(PWD) clean
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
