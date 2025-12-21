@@ -60,6 +60,8 @@ static int g_rx_count;
 
 static struct can_eth_stats g_stats;
 
+static int g_stopping;
+
 static int ring_push(const struct can_frame_simple *f)
 {
   if (g_rx_count >= RX_RING_SIZE)
@@ -222,9 +224,12 @@ static ssize_t caneth_read(struct file *filp, char __user *buf, size_t len, loff
     if (ret < 0)
       return -EAGAIN;
   } else {
-    ret = wait_event_interruptible(g_rx_wq, g_rx_count > 0 || kthread_should_stop());
+    ret = wait_event_interruptible(g_rx_wq, g_rx_count > 0 || g_stopping);
     if (ret)
       return ret;
+
+    if (g_stopping && g_rx_count == 0)
+      return 0;
 
     mutex_lock(&g_lock);
     ret = ring_pop(&f);
@@ -294,6 +299,7 @@ static int __init caneth_init(void)
   int ret;
 
   init_waitqueue_head(&g_rx_wq);
+  g_stopping = 0;
 
   ret = alloc_chrdev_region(&g_devnum, 0, 1, DEV_NAME);
   if (ret < 0)
@@ -361,6 +367,9 @@ err_chrdev:
 
 static void __exit caneth_exit(void)
 {
+  g_stopping = 1;
+  wake_up_interruptible(&g_rx_wq);
+
   if (g_rx_thread) {
     kthread_stop(g_rx_thread);
     g_rx_thread = NULL;
