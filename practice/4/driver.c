@@ -100,7 +100,7 @@ int init_module(void) {
   if (IS_ERR(my_class))
     return -1;
 
-  // создаём спецфайл автоматически
+  // создаём спецфайл
   device_create(my_class, NULL, dev_num, NULL, "pz4_dev");
 
   pr_info("драйвер загружен, major=%d\n", MAJOR(dev_num));
