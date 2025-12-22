@@ -6,11 +6,11 @@
 
 #define BUF_SIZE 256
 
-#define IOCTL_CLEAR _IO('q', 1)         // очистка буфера
+#define IOCTL_CLEAR _IO('q', 1)  // очистка буфера
 #define IOCTL_HASDATA _IOR('q', 2, int) // узнать, есть ли данные
 
 static char gbuf[BUF_SIZE]; // глобальный буфер
-static int gbuf_len = 0;    // сколько данных в буфере
+static int gbuf_len = 0;  // сколько данных в буфере
 
 static dev_t dev_num; // номер устройства
 static struct cdev my_cdev;
