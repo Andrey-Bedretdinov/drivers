@@ -1,33 +1,37 @@
-#include <linux/module.h>
-#include <linux/fs.h>
 #include <linux/cdev.h>
-#include <linux/device.h>
-#include <linux/uaccess.h>
-#include <linux/mutex.h>
-#include <linux/wait.h>
-#include <linux/kthread.h>
 #include <linux/delay.h>
+#include <linux/device.h>
+#include <linux/fs.h>
+#include <linux/kthread.h>
+#include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/poll.h>
 #include <linux/types.h>
-
-#include <linux/net.h>
-#include <net/sock.h>
+#include <linux/uaccess.h>
+#include <linux/wait.h>
 #include <linux/in.h>
 #include <linux/inet.h>
+#include <linux/net.h>
+#include <net/sock.h>
 
 #define DEV_NAME "can_eth"
 #define RX_RING_SIZE 128
-
 #define CAN_ETH_MAGIC 'q'
-#define IOCTL_CLEAR_RX  _IO(CAN_ETH_MAGIC, 1)
+
+// команда очистки rx буфера
+#define IOCTL_CLEAR_RX _IO(CAN_ETH_MAGIC, 1)
+
+// команда получения статистики
 #define IOCTL_GET_STATS _IOR(CAN_ETH_MAGIC, 2, struct can_eth_stats)
 
+// структура can кадра
 struct can_frame_simple {
   u32 id;
-  u8  dlc;
-  u8  data[8];
+  u8 dlc;
+  u8 data[8];
 };
 
+// структура статистики драйвера
 struct can_eth_stats {
   u64 tx_frames;
   u64 rx_frames;
@@ -42,28 +46,50 @@ module_param(peer_ip, charp, 0644);
 module_param(peer_port, int, 0644);
 module_param(listen_port, int, 0644);
 
+// номер устройства major/minor
 static dev_t g_devnum;
+
+// структура символьного устройства
 static struct cdev g_cdev;
+
+// класс устройства для sysfs
 static struct class *g_class;
+
+// объект устройства
 static struct device *g_device;
 
+// udp сокет в ядре
 static struct socket *g_udp_sock;
+
+// kernel thread для приёма данных
 static struct task_struct *g_rx_thread;
 
+// очередь ожидания для read
 static wait_queue_head_t g_rx_wq;
+
+// мьютекс для защиты общих данных
 static DEFINE_MUTEX(g_lock);
 
+// кольцевой буфер для принятых кадров
 static struct can_frame_simple g_rx_ring[RX_RING_SIZE];
+
+// индекс головы буфера
 static int g_rx_head;
+
+// индекс хвоста буфера
 static int g_rx_tail;
+
+// количество элементов в буфере
 static int g_rx_count;
 
+// статистика драйвера
 static struct can_eth_stats g_stats;
 
+// флаг завершения работы драйвера
 static int g_stopping;
 
-static int ring_push(const struct can_frame_simple *f)
-{
+// кладём кадр в кольцевой буфер
+static int ring_push(const struct can_frame_simple *f) {
   if (g_rx_count >= RX_RING_SIZE)
     return -1;
 
@@ -73,8 +99,8 @@ static int ring_push(const struct can_frame_simple *f)
   return 0;
 }
 
-static int ring_pop(struct can_frame_simple *f)
-{
+// забираем кадр из кольцевого буфера
+static int ring_pop(struct can_frame_simple *f) {
   if (g_rx_count == 0)
     return -1;
 
@@ -84,8 +110,8 @@ static int ring_pop(struct can_frame_simple *f)
   return 0;
 }
 
-static int udp_bind(int port)
-{
+// биндим udp сокет на нужный порт
+static int udp_bind(int port) {
   struct sockaddr_in addr;
 
   memset(&addr, 0, sizeof(addr));
@@ -96,8 +122,8 @@ static int udp_bind(int port)
   return kernel_bind(g_udp_sock, (struct sockaddr *)&addr, sizeof(addr));
 }
 
-static int udp_send_frame(const struct can_frame_simple *f)
-{
+// отправка одного can кадра по udp
+static int udp_send_frame(const struct can_frame_simple *f) {
   struct sockaddr_in addr;
   struct msghdr msg;
   struct kvec iov;
@@ -127,8 +153,8 @@ static int udp_send_frame(const struct can_frame_simple *f)
   return 0;
 }
 
-static int rx_thread_fn(void *arg)
-{
+// функция kernel thread для приёма udp пакетов
+static int rx_thread_fn(void *arg) {
   struct can_frame_simple f;
   struct msghdr msg;
   struct kvec iov;
@@ -183,8 +209,9 @@ static int rx_thread_fn(void *arg)
   return 0;
 }
 
-static ssize_t caneth_write(struct file *filp, const char __user *buf, size_t len, loff_t *off)
-{
+// write из user space в драйвер
+static ssize_t caneth_write(struct file *filp, const char __user *buf,
+                            size_t len, loff_t *off) {
   struct can_frame_simple f;
   int ret;
 
@@ -208,8 +235,9 @@ static ssize_t caneth_write(struct file *filp, const char __user *buf, size_t le
   return sizeof(f);
 }
 
-static ssize_t caneth_read(struct file *filp, char __user *buf, size_t len, loff_t *off)
-{
+// read из драйвера в user space
+static ssize_t caneth_read(struct file *filp, char __user *buf, size_t len,
+                           loff_t *off) {
   struct can_frame_simple f;
   int ret;
 
@@ -245,8 +273,8 @@ static ssize_t caneth_read(struct file *filp, char __user *buf, size_t len, loff
   return sizeof(f);
 }
 
-static __poll_t caneth_poll(struct file *filp, poll_table *wait)
-{
+// poll поддержка для select/poll/epoll
+static __poll_t caneth_poll(struct file *filp, poll_table *wait) {
   __poll_t mask = 0;
 
   poll_wait(filp, &g_rx_wq, wait);
@@ -259,8 +287,9 @@ static __poll_t caneth_poll(struct file *filp, poll_table *wait)
   return mask;
 }
 
-static long caneth_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
-{
+// ioctl для служебных команд
+static long caneth_ioctl(struct file *filp, unsigned int cmd,
+                         unsigned long arg) {
   struct can_eth_stats st;
 
   switch (cmd) {
@@ -286,6 +315,7 @@ static long caneth_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
   }
 }
 
+// таблица операций символьного устройства
 static const struct file_operations g_fops = {
     .owner = THIS_MODULE,
     .read = caneth_read,
@@ -294,8 +324,8 @@ static const struct file_operations g_fops = {
     .poll = caneth_poll,
 };
 
-static int __init caneth_init(void)
-{
+// инициализация модуля
+static int __init caneth_init(void) {
   int ret;
 
   init_waitqueue_head(&g_rx_wq);
@@ -326,7 +356,8 @@ static int __init caneth_init(void)
     goto err_class;
   }
 
-  ret = sock_create_kern(&init_net, AF_INET, SOCK_DGRAM, IPPROTO_UDP, &g_udp_sock);
+  ret = sock_create_kern(&init_net, AF_INET, SOCK_DGRAM, IPPROTO_UDP,
+                         &g_udp_sock);
   if (ret < 0)
     goto err_devnode;
 
@@ -365,8 +396,8 @@ err_chrdev:
   return ret;
 }
 
-static void __exit caneth_exit(void)
-{
+// выгрузка модуля
+static void __exit caneth_exit(void) {
   g_stopping = 1;
   wake_up_interruptible(&g_rx_wq);
 
