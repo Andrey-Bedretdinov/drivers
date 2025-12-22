@@ -399,4 +399,3 @@ module_exit(caneth_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("andrey");
-MODULE_DESCRIPTION("simple can frames over udp through char device");
